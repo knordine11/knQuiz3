@@ -18,6 +18,7 @@ extern float note_acc;
 extern int noteC_no;
 extern int noteC_oct;
 extern float nn_l[12];
+extern bool collectMicData;
 
 
 class FftStuff : public QObject

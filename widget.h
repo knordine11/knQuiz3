@@ -8,6 +8,7 @@
 #include <QIODevice>
 #include <QMediaDevices>
 #include <QScopedPointer>
+#include <QThread>
 
 class Microphone : public QIODevice
 {
@@ -26,9 +27,13 @@ public:
 
     qreal getNoteValue(const char *data, qint64 len) const;
 
+public slots:
+    void endMicInput();
+
 signals:
     void levelChanged(qreal level);
     void haltstream();
+    void haltstream200000();
 
 private:
     const QAudioFormat m_format;
@@ -67,6 +72,9 @@ class Widget : public QWidget
 public:
     explicit Widget(QWidget *parent = nullptr);
     ~Widget() override;
+
+    QThread SpeakerThread;
+    QThread MicThread;
     void do_Orientation(int);
     void do_Quiz(int);
     int nPos;
@@ -79,21 +87,25 @@ public:
     QMediaDevices *m_devicesOut = nullptr;
     QScopedPointer<Microphone> m_Microphone;
     QScopedPointer<QAudioSource> m_audioSource;
+    QMediaDevices *m_devicesIn = nullptr;
+    QScopedPointer<Speaker> m_Speaker;
+    QScopedPointer<QAudioSink> m_audioOutput;
     bool m_pullMode = false;
 
 public slots:
     void micFoundNote(int value);
     void updateKBnote(int kbValue, float acc);
+    void hit200000();
 
 protected:
     void paintEvent(QPaintEvent *event);
 
 private slots:
-    void on_btnStart_clicked();
-    void startSound();
-    void stopSound();
+    void on_btnStart_clicked();    
     void on_btnStop_clicked();
     void on_btnNext_clicked();
+    void startSound();
+    void stopSound();
 
 private:
     void initializeAudioOutput(const QAudioDevice &deviceInfo);
@@ -102,11 +114,8 @@ private:
 
 signals:
     void startSpeaker();
-
-private:
-    QMediaDevices *m_devicesIn = nullptr;
-    QScopedPointer<Speaker> m_Speaker;
-    QScopedPointer<QAudioSink> m_audioOutput;
+    void startMic();
+    void stopMic();
 
 private:
     Ui::Widget *ui;

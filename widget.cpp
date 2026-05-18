@@ -12,7 +12,9 @@
 #include <QMessageBox>
 #include <QFuture>
 #include <QtConcurrent>
+#include <QMessageBox>
 
+int test_val = 0;
 int curLessonInt = 0;
 int orientation [21] = {1,2,3,4,5,6,7,8,1,8,1,8,1,8,7,6,5,4,3,2,1};
 QMap<QString, int> tonic_map = {
@@ -98,20 +100,31 @@ qreal Microphone::getNoteValue(const char *data, qint64 len) const
         frame_start = frame_end;
         frame_end = frame_end + frame_size;}
 
-    // emit void haltstream();
+    emit void haltstream();
     if (rec_arr_cnt > 200000)
     {
-        // qDebug() <<"                      restsrt here";
-        // qDebug() <<"                   Microphone::pos()  "<<Microphone::pos();
+        rec_arr_cnt = 0;
+        frame_start = 0;
+        qDebug() << ">>>>>>>>zero position at 200000 " << rec_arr_cnt;
+        emit void haltstream200000();
+        qDebug() <<"                      restart here";
+        qDebug() <<"                   Microphone::pos()  "<<Microphone::pos();
     }
+    test_val++;
+    qDebug() << ">>> " << test_val;
     return maxValue;
+}
+
+void Microphone::endMicInput()
+{
+    qDebug() << "ending mic input";
 }
 
 qint64 Microphone::writeData(const char *data, qint64 len)
 {
     if(collectMicData)
     {
-        // qDebug() <<" %%%%%% :writeData(const char *data, qint64 len)  "<<&data<<" len "<<len;
+        //qDebug() <<" %%%%%% :writeData(const char *data, qint64 len)  "<<&data<<" len "<<len;
         m_level = getNoteValue(data, len);
     }
     return len;
@@ -157,7 +170,7 @@ qint64 Speaker::readData(char *data, qint64 len)
             qDebug() << "chunk..." << chunk << "pos> = " << m_pos ;
         }
     }
-    qDebug() << "is Main Thread in readData: " << QThread::isMainThread();
+    qDebug() << ">>>>>>>>>>>is Main Thread in readData: " << QThread::isMainThread();
     return total;
 }
 
@@ -195,13 +208,19 @@ Widget::Widget(QWidget *parent)
 
     connect(ui->btnStart, &QPushButton::clicked, this,&Widget::startSound);
     connect(ui->btnStart, &QPushButton::clicked, this,&Widget::restartAudioStream);
+    connect(ui->btnNext, &QPushButton::clicked, this,&Widget::startSound);
     connect(ui->btnNext, &QPushButton::clicked, this,&Widget::restartAudioStream);
     connect(&fts, &FftStuff::on_foundNote, this, &Widget::micFoundNote);
     connect(&fts, &FftStuff::valueChanged,this, &Widget::updateKBnote);
+    connect(m_Microphone.data(), &Microphone::haltstream, this, &Widget::stopSound);
+    connect(m_Microphone.data(), &Microphone::haltstream200000, this, &Widget::hit200000);
+    connect(this, &Widget::stopMic, m_Microphone.data(), &Microphone::endMicInput);
 }
 
 Widget::~Widget()
 {
+    SpeakerThread.quit();
+    MicThread.quit();
     delete ui;
 }
 
@@ -242,8 +261,14 @@ void Widget::updateKBnote(int kbValue, float acc)
     ui->lb_tuner->repaint();
 }
 
+void Widget::hit200000()
+{
+    qDebug() << "hit 200000...";
+}
+
 void Widget::micFoundNote(int value)
 {
+    MicThread.exit();
     m_Microphone->reset();
     //m_Microphone->haltstream();
     qDebug() << "-->note found: " << value;
@@ -389,6 +414,7 @@ void Widget::micFoundNote(int value)
 
     m_Microphone->start();
     ui->lb_arrow->move(800, 100);
+    collectMicData = true;
 }
 
 void Widget::initializeAudioOutput(const QAudioDevice &deviceInfo)
@@ -413,6 +439,7 @@ void Widget::initializeAudioInput(const QAudioDevice &deviceInfo)
 
     m_Microphone.reset(new Microphone(format));
     m_audioSource.reset(new QAudioSource(deviceInfo, format));
+    m_Microphone->seek(0);
     m_Microphone->start();
 }
 
@@ -423,44 +450,21 @@ void Widget::restartAudioStream()
     m_Microphone->start();
     m_audioSource->stop();
     qDebug()<<" restartAudioStream() |  m_pullMode  "<<m_pullMode;
-    if (m_pullMode) {
-        // pull mode: QAudioSource provides a QIODevice to pull from
-        auto *io = m_audioSource->start();
-        if (!io)
-            return;
-
-        connect(io, &QIODevice::readyRead, [this, io]() {
-            static const qint64 BufferSize = 4096;
-            const qint64 len = qMin(m_audioSource->bytesAvailable(), BufferSize);
-
-            QByteArray buffer(len, 0);
-            qint64 l = io->read(buffer.data(), len);
-
-            qDebug() << "io->read(buffer.data(), len) "<<l;
-
-            if (l > 0) {
-                const qreal level = m_Microphone->getNoteValue(buffer.constData(), l);
-                // qDebug()<<" level  " << level;
-            }
-        });
-    } else {
-        // push mode: QIODevice pushes data into QIODevice
-        m_audioSource->start(m_Microphone.get());
-        qDebug() << "=========exit push===================";
-    }
+    m_audioSource->start(m_Microphone.get());
 }
 
 void Widget::startSound()
 {
-    //qDebug() << "is Main Thread: " << QThread::isMainThread();
+    qDebug() << ">>>>>>>>>>>>>>is Main Thread: " << QThread::isMainThread();
     m_Speaker->start();
     m_audioOutput->stop();
     m_audioOutput->start(m_Speaker.data());
-    qDebug() << "is Main Thread after start: " << QThread::isMainThread();
+    qDebug() << ">>>>>>>>>>>>>>>>is Main Thread after start: " << QThread::isMainThread();
 }
 
 void Widget::stopSound()
 {
+    qDebug() << "in stop sound...";
     m_audioOutput->reset();
     m_audioOutput->stop();
     m_Speaker->stop();
@@ -498,6 +502,10 @@ void Widget::on_btnStart_clicked()
     FileLoader files;
     files.GetFileList(tonicNote);
     nPos = 0;
+    m_Speaker->moveToThread(&SpeakerThread);
+    SpeakerThread.start();
+    m_Microphone->moveToThread(&MicThread);
+    MicThread.start();
     do_Orientation(nPos);
     nPos++;
 }
@@ -511,6 +519,7 @@ void Widget::do_Orientation(int nPos)
     m_Speaker->start();
     m_audioOutput->stop();
     m_audioOutput->start(m_Speaker.data());
+    MicThread.start();
 }
 
 void Widget::do_Quiz(int)
@@ -526,8 +535,8 @@ void Widget::on_btnNext_clicked()
 {
     if (orientationFlag == true)
     {
-        //QFuture<void> test = QtConcurrent::run(&Widget::do_Orientation, this, nPos);
         do_Orientation(nPos);
+        m_Microphone->seek(0);
         if(nPos == 20)
         {
             orientationFlag=false;

@@ -285,7 +285,7 @@ void FftStuff::DoIt(int beg, int lengh)
 
 void FftStuff::onTimeout()
 {
-    qDebug() << "   $$$$$ %%%%%  TIME OUT HAPPEND  ";
+    qDebug() << "   $$$$$ %%%%%  TIME OUT HAPPENED  ";
 }
 
 double FftStuff::abs_c(fftw_complex c)
