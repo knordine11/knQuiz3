@@ -1,4 +1,4 @@
-QT += widgets multimedia concurrent
+QT += widgets multimedia
 
 CONFIG += c++17
 

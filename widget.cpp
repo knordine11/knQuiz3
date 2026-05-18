@@ -10,9 +10,6 @@
 #include <QPainter>
 #include <QThread>
 #include <QMessageBox>
-#include <QFuture>
-#include <QtConcurrent>
-#include <QMessageBox>
 
 int test_val = 0;
 int curLessonInt = 0;
@@ -100,13 +97,13 @@ qreal Microphone::getNoteValue(const char *data, qint64 len) const
         frame_start = frame_end;
         frame_end = frame_end + frame_size;}
 
-    emit void haltstream();
+    //emit void haltstream();
     if (rec_arr_cnt > 200000)
     {
         rec_arr_cnt = 0;
         frame_start = 0;
         qDebug() << ">>>>>>>>zero position at 200000 " << rec_arr_cnt;
-        emit void haltstream200000();
+        //emit void haltstream200000();
         qDebug() <<"                      restart here";
         qDebug() <<"                   Microphone::pos()  "<<Microphone::pos();
     }
@@ -269,8 +266,10 @@ void Widget::hit200000()
 void Widget::micFoundNote(int value)
 {
     MicThread.exit();
+    m_Microphone->seek(0);
     m_Microphone->reset();
-    //m_Microphone->haltstream();
+    m_Microphone->stop();
+
     qDebug() << "-->note found: " << value;
     stopSound();
     heardNote = value;
@@ -533,6 +532,7 @@ void Widget::do_Quiz(int)
 
 void Widget::on_btnNext_clicked()
 {
+    test_val = 0;
     if (orientationFlag == true)
     {
         do_Orientation(nPos);
