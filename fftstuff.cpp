@@ -2,7 +2,6 @@
 #include <iostream>
 #include "fftw3/fftw3.h"
 #include "qdebug.h"
-#include "qpoint.h"
 #include <cmath>
 #include <iomanip>
 #include <QTimer>
@@ -277,6 +276,7 @@ void FftStuff::DoIt(int beg, int lengh)
     qDebug() << "===%%%%%%%%%%%%%%%   before timer %%%%%%%%%%%%";
 
     qDebug()<< "note value = " << noteC_no;
+    rec_arr_cnt = 0;
 
     qDebug() << "===%%%%%%%%%%%%%%%   after timer %%%%%%%%%%%%";
 

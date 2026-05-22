@@ -32,8 +32,7 @@ public slots:
 
 signals:
     void levelChanged(qreal level);
-    void haltstream();
-    void haltstream200000();
+    void haltstream() const;
 
 private:
     const QAudioFormat m_format;
@@ -85,9 +84,9 @@ public:
     bool orientationFlag;
     bool timeDelay;
     QMediaDevices *m_devicesOut = nullptr;
-    QScopedPointer<Microphone> m_Microphone;
-    QScopedPointer<QAudioSource> m_audioSource;
-    QMediaDevices *m_devicesIn = nullptr;
+    QSharedPointer<Microphone> m_Microphone;
+    QSharedPointer<QAudioSource> m_audioSource;
+    //QMediaDevices *m_devicesIn = nullptr;
     QScopedPointer<Speaker> m_Speaker;
     QScopedPointer<QAudioSink> m_audioOutput;
     bool m_pullMode = false;
@@ -95,7 +94,6 @@ public:
 public slots:
     void micFoundNote(int value);
     void updateKBnote(int kbValue, float acc);
-    void hit200000();
 
 protected:
     void paintEvent(QPaintEvent *event);

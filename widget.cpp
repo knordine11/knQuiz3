@@ -25,7 +25,6 @@ QMap<int, int> tileKbShift = {
     {0, 0}, {1, 2}, {2, 4}, {3, 5}, {4, 7}, {5, 9}, {6, 11}, {7, 12}
 };
 FftStuff fts;
-Speaker speaker;
 QThread speakerThread;
 QThread microphoneThread;
 extern bool collectMicData;
@@ -58,6 +57,7 @@ Microphone::Microphone(const QAudioFormat &format) : m_format(format) {
 
 void Microphone::start()
 {
+    collectMicData=true;
     open(QIODevice::WriteOnly);
 }
 
@@ -95,26 +95,38 @@ qreal Microphone::getNoteValue(const char *data, qint64 len) const
 
         fts.DoIt(frame_start, frame_size);
         frame_start = frame_end;
-        frame_end = frame_end + frame_size;}
+        frame_end = frame_end + frame_size;
+    }
 
-    //emit void haltstream();
     if (rec_arr_cnt > 200000)
     {
+        qDebug()<<"  200000 hit value " << collectMicData;
         rec_arr_cnt = 0;
         frame_start = 0;
+        frame_end = frame_end + frame_size;
         qDebug() << ">>>>>>>>zero position at 200000 " << rec_arr_cnt;
-        //emit void haltstream200000();
+
+        emit haltstream();
+
         qDebug() <<"                      restart here";
         qDebug() <<"                   Microphone::pos()  "<<Microphone::pos();
     }
     test_val++;
+    qDebug() <<"Microphone::pos()  "<<Microphone::pos();
     qDebug() << ">>> " << test_val;
     return maxValue;
 }
 
 void Microphone::endMicInput()
 {
-    qDebug() << "ending mic input";
+    qDebug() << "------->ending mic input";
+    qDebug() << "isSequential: " << this->isSequential();
+    microphoneThread.exit();
+
+    speakerThread.exit();
+    // rec_arr_cnt = 0;
+    // frame_start = 0;
+
 }
 
 qint64 Microphone::writeData(const char *data, qint64 len)
@@ -205,12 +217,10 @@ Widget::Widget(QWidget *parent)
 
     connect(ui->btnStart, &QPushButton::clicked, this,&Widget::startSound);
     connect(ui->btnStart, &QPushButton::clicked, this,&Widget::restartAudioStream);
-    connect(ui->btnNext, &QPushButton::clicked, this,&Widget::startSound);
-    connect(ui->btnNext, &QPushButton::clicked, this,&Widget::restartAudioStream);
     connect(&fts, &FftStuff::on_foundNote, this, &Widget::micFoundNote);
     connect(&fts, &FftStuff::valueChanged,this, &Widget::updateKBnote);
     connect(m_Microphone.data(), &Microphone::haltstream, this, &Widget::stopSound);
-    connect(m_Microphone.data(), &Microphone::haltstream200000, this, &Widget::hit200000);
+    connect(m_Microphone.data(), &Microphone::haltstream, this, &Widget::stopMic);
     connect(this, &Widget::stopMic, m_Microphone.data(), &Microphone::endMicInput);
 }
 
@@ -245,7 +255,7 @@ void Widget::paintEvent(QPaintEvent *event)
 
 void Widget::updateKBnote(int kbValue, float acc)
 {
-
+    //emit stopMic();
     int letter = kbValue%12;
     int octaveValue = kbValue/12;
     QString theNote = note_letters[letter] + QString::number(octaveValue);
@@ -258,17 +268,13 @@ void Widget::updateKBnote(int kbValue, float acc)
     ui->lb_tuner->repaint();
 }
 
-void Widget::hit200000()
-{
-    qDebug() << "hit 200000...";
-}
-
 void Widget::micFoundNote(int value)
 {
     MicThread.exit();
     m_Microphone->seek(0);
     m_Microphone->reset();
     m_Microphone->stop();
+    qDebug() << ">>>>MicThread is running>>>>> " << MicThread.isRunning();
 
     qDebug() << "-->note found: " << value;
     stopSound();
@@ -411,9 +417,33 @@ void Widget::micFoundNote(int value)
                              "border-style: outset;"
                              " border-width: 3px; border-color: black;}");
 
-    m_Microphone->start();
     ui->lb_arrow->move(800, 100);
     collectMicData = true;
+    m_Microphone->seek(0);
+    m_Microphone->stop();
+    m_Microphone->start();
+    m_audioSource->stop();
+    qDebug()<<" restartAudioStream() |  m_pullMode  "<<m_pullMode;
+    m_audioSource->start(m_Microphone.get());
+    test_val = 0;
+    if (orientationFlag == true)
+    {
+        do_Orientation(nPos);
+        m_Microphone->seek(0);
+        if(nPos == 20)
+        {
+            orientationFlag=false;
+            nPos = 0;
+        }
+    } else {
+        do_Quiz(nPos);
+        if(nPos == 19)
+        {
+            orientationFlag=true;
+            qDebug() << "test complete";
+        }
+    }
+    nPos++;
 }
 
 void Widget::initializeAudioOutput(const QAudioDevice &deviceInfo)
@@ -445,6 +475,7 @@ void Widget::initializeAudioInput(const QAudioDevice &deviceInfo)
 void Widget::restartAudioStream()
 {
     collectMicData = true;
+    m_Microphone->seek(0);
     m_Microphone->stop();
     m_Microphone->start();
     m_audioSource->stop();
@@ -454,7 +485,7 @@ void Widget::restartAudioStream()
 
 void Widget::startSound()
 {
-    qDebug() << ">>>>>>>>>>>>>>is Main Thread: " << QThread::isMainThread();
+    qDebug() << ">>>>>>>>>>>>>>is Main Thread in startSound: " << QThread::isMainThread();
     m_Speaker->start();
     m_audioOutput->stop();
     m_audioOutput->start(m_Speaker.data());
@@ -467,6 +498,10 @@ void Widget::stopSound()
     m_audioOutput->reset();
     m_audioOutput->stop();
     m_Speaker->stop();
+    m_Microphone->reset();
+    m_Microphone->close();
+    m_audioSource->stop();
+    microphoneThread.exit();
 }
 
 void Widget::on_btnStop_clicked()
@@ -528,28 +563,4 @@ void Widget::do_Quiz(int)
     m_Speaker->start();
     m_audioOutput->stop();
     m_audioOutput->start(m_Speaker.data());
-}
-
-void Widget::on_btnNext_clicked()
-{
-    test_val = 0;
-    if (orientationFlag == true)
-    {
-        do_Orientation(nPos);
-        m_Microphone->seek(0);
-        if(nPos == 20)
-        {
-            orientationFlag=false;
-            nPos = 0;
-        }
-    } else {
-        do_Quiz(nPos);
-        if(nPos == 19)
-        {
-            orientationFlag=true;
-            qDebug() << "test complete";
-            ui->btnNext->setVisible(false);
-        }
-    }
-    nPos++;
 }
