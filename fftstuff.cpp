@@ -83,62 +83,11 @@ bool Flag_up = true;
 int nn_compair=-1;
 int nn_compair_cnt = 0;
 
-
-
-
 FftStuff::FftStuff(QObject *parent)
     : QObject{parent}
 {
 
-
 }
-
-// added begin ----------------------------
-// void FftStuff::next_frame()
-
-
-// void FftStuff::onTimeout()
-// {
-//     qDebug() << "   $$$$$ %%%%%  TIME OUT HAPPEND  ";
-// }
-
-// void FftStuff::startTimer()
-// {
-//     QTimer::singleShot(3000,this,SLOT(onTimeout));
-// }
-
-
-
-
-
-void FftStuff:: make_sin(double freq ,int beg, int leng){
-    double Pi = 3.14159265358979323846;
-    int i = beg;
-    int en = leng+beg;
-    temp_freq = freq;
-    cout << endl << "--------( " << freq << " Hz )-- " << beg <<" { make_sin  } " << en << endl;
-    while (i < en) {
-        rec_arr[i] = sin(2 * Pi * freq * i /44100 ) ;
-        // rec_arr[i] = i*2 ;
-        // cout << i <<" ~ "<< rec_arr[i]<<endl;
-        i=i+1;
-    }
-}
-
-void FftStuff::next_frame()
-{
-    // cout<<" STARTING FRAME  "<<frame_start<<endl;
-    if(rec_arr_cnt > frame_end){
-        cout<<" STARTING FRAME  "<<frame_start<<endl;
-        FftStuff fts;
-        fts.DoIt(frame_start, frame_size);
-        frame_start = frame_end;
-        frame_end = frame_end + frame_size;}
-}
-//     // DoIt(frame_start, frame_size);
-//     cout<<
-// }
-// $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 // ================         THE MAIN MODUAL STARTS         ============================
 

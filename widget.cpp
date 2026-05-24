@@ -36,7 +36,7 @@ extern int frame_end;
 extern int rec_arr_end;
 QByteArray bufferReadTo;
 QByteArray *currentAudioOut;
-QList<QByteArray> note_tone;
+// QList<QByteArray> note_tone;
 int major_number_list[] = {0,2,4,5,7,9,11,12};
 int tonic_nunber;
 int audio_number_list;
@@ -91,7 +91,7 @@ qreal Microphone::getNoteValue(const char *data, qint64 len) const
     // qDebug()<<"    END OF DATA FROM MIC---------->   rec_arr_cnt "<<rec_arr_cnt;
 
     if(rec_arr_cnt > frame_end){
-        cout<<"\n  NEXT FRAME $$$$ "<<frame_start<<endl;
+        cout<<"\n mic NEXT FRAME $$$$ "<<frame_start<<endl;
 
         fts.DoIt(frame_start, frame_size);
         frame_start = frame_end;
@@ -106,7 +106,8 @@ qreal Microphone::getNoteValue(const char *data, qint64 len) const
         frame_end = frame_end + frame_size;
         qDebug() << ">>>>>>>>zero position at 200000 " << rec_arr_cnt;
 
-        emit haltstream();
+        emit on_timeOut();
+        // emit haltstream();
 
         qDebug() <<"                      restart here";
         qDebug() <<"                   Microphone::pos()  "<<Microphone::pos();
@@ -138,7 +139,6 @@ qint64 Microphone::writeData(const char *data, qint64 len)
     }
     return len;
 }
-
 
 Speaker::Speaker()
 {
@@ -210,6 +210,7 @@ Widget::Widget(QWidget *parent)
     FileLoader::GetRandomTestSet(gTestGroup[curLessonInt]);
     initializeAudioOutput(m_devicesOut->defaultAudioOutput());
     initializeAudioInput(QMediaDevices::defaultAudioInput());
+    ui->btnNext->setVisible(false);
     ui->lb_review->setText("Start");
     ui->lb_title->setText("Lesson");
     accValue = 0;
@@ -222,6 +223,7 @@ Widget::Widget(QWidget *parent)
     connect(m_Microphone.data(), &Microphone::haltstream, this, &Widget::stopSound);
     connect(m_Microphone.data(), &Microphone::haltstream, this, &Widget::stopMic);
     connect(this, &Widget::stopMic, m_Microphone.data(), &Microphone::endMicInput);
+    connect(m_Microphone.data(), &Microphone::on_timeOut, this, &Widget::timeOut);
 }
 
 Widget::~Widget()
@@ -266,6 +268,26 @@ void Widget::updateKBnote(int kbValue, float acc)
     qDebug() << "acc is: " << (int)(acc * 1000);
     accValue = (int)(acc * 1000);
     ui->lb_tuner->repaint();
+}
+
+void Widget::timeOut()
+{
+    m_Microphone->seek(0);
+    MicThread.exit();
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(this, "Timed Out", "Continue?",
+                                  QMessageBox::Yes|QMessageBox::No);
+    if (reply == QMessageBox::Yes) {
+        qDebug() << "continuing...";
+        rec_arr_cnt = 0;
+        m_Speaker->start();
+        MicThread.start();
+        m_Microphone->start();
+        m_audioSource->start(m_Microphone.get());
+    } else {
+        qDebug() << "No was clicked";
+        QApplication::quit();
+    }    
 }
 
 void Widget::micFoundNote(int value)
@@ -476,9 +498,9 @@ void Widget::restartAudioStream()
 {
     collectMicData = true;
     m_Microphone->seek(0);
-    m_Microphone->stop();
-    m_Microphone->start();
-    m_audioSource->stop();
+    // m_Microphone->stop();
+    // m_Microphone->start();
+    // m_audioSource->stop();
     qDebug()<<" restartAudioStream() |  m_pullMode  "<<m_pullMode;
     m_audioSource->start(m_Microphone.get());
 }
@@ -495,13 +517,13 @@ void Widget::startSound()
 void Widget::stopSound()
 {
     qDebug() << "in stop sound...";
-    m_audioOutput->reset();
+    m_audioSource->stop();
+    m_Microphone->stop();
     m_audioOutput->stop();
     m_Speaker->stop();
-    m_Microphone->reset();
-    m_Microphone->close();
-    m_audioSource->stop();
-    microphoneThread.exit();
+
+    MicThread.exit();
+    qDebug() << "exiting stop sound...";
 }
 
 void Widget::on_btnStop_clicked()
@@ -564,3 +586,9 @@ void Widget::do_Quiz(int)
     m_audioOutput->stop();
     m_audioOutput->start(m_Speaker.data());
 }
+
+void Widget::on_btnNext_clicked()
+{
+
+}
+

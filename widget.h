@@ -33,6 +33,7 @@ public slots:
 signals:
     void levelChanged(qreal level);
     void haltstream() const;
+    void on_timeOut() const;
 
 private:
     const QAudioFormat m_format;
@@ -94,6 +95,7 @@ public:
 public slots:
     void micFoundNote(int value);
     void updateKBnote(int kbValue, float acc);
+    void timeOut();
 
 protected:
     void paintEvent(QPaintEvent *event);
