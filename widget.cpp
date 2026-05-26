@@ -107,7 +107,6 @@ qreal Microphone::getNoteValue(const char *data, qint64 len) const
         qDebug() << ">>>>>>>>zero position at 200000 " << rec_arr_cnt;
 
         emit on_timeOut();
-        // emit haltstream();
 
         qDebug() <<"                      restart here";
         qDebug() <<"                   Microphone::pos()  "<<Microphone::pos();
@@ -116,18 +115,6 @@ qreal Microphone::getNoteValue(const char *data, qint64 len) const
     qDebug() <<"Microphone::pos()  "<<Microphone::pos();
     qDebug() << ">>> " << test_val;
     return maxValue;
-}
-
-void Microphone::endMicInput()
-{
-    qDebug() << "------->ending mic input";
-    qDebug() << "isSequential: " << this->isSequential();
-    microphoneThread.exit();
-
-    speakerThread.exit();
-    // rec_arr_cnt = 0;
-    // frame_start = 0;
-
 }
 
 qint64 Microphone::writeData(const char *data, qint64 len)
@@ -179,7 +166,7 @@ qint64 Speaker::readData(char *data, qint64 len)
             qDebug() << "chunk..." << chunk << "pos> = " << m_pos ;
         }
     }
-    qDebug() << ">>>>>>>>>>>is Main Thread in readData: " << QThread::isMainThread();
+    qDebug() << ">>is Main Thread in speaker readData: " << QThread::isMainThread();
     return total;
 }
 
@@ -220,9 +207,6 @@ Widget::Widget(QWidget *parent)
     connect(ui->btnStart, &QPushButton::clicked, this,&Widget::restartAudioStream);
     connect(&fts, &FftStuff::on_foundNote, this, &Widget::micFoundNote);
     connect(&fts, &FftStuff::valueChanged,this, &Widget::updateKBnote);
-    connect(m_Microphone.data(), &Microphone::haltstream, this, &Widget::stopSound);
-    connect(m_Microphone.data(), &Microphone::haltstream, this, &Widget::stopMic);
-    connect(this, &Widget::stopMic, m_Microphone.data(), &Microphone::endMicInput);
     connect(m_Microphone.data(), &Microphone::on_timeOut, this, &Widget::timeOut);
 }
 
@@ -257,7 +241,6 @@ void Widget::paintEvent(QPaintEvent *event)
 
 void Widget::updateKBnote(int kbValue, float acc)
 {
-    //emit stopMic();
     int letter = kbValue%12;
     int octaveValue = kbValue/12;
     QString theNote = note_letters[letter] + QString::number(octaveValue);
@@ -282,8 +265,12 @@ void Widget::timeOut()
         rec_arr_cnt = 0;
         m_Speaker->start();
         MicThread.start();
-        m_Microphone->start();
+        m_audioSource->stop();
+        m_audioSource->setVolume(1.0);
         m_audioSource->start(m_Microphone.get());
+        // m_Microphone->start();
+        // m_audioSource.reset();
+        // m_audioSource->start();
     } else {
         qDebug() << "No was clicked";
         QApplication::quit();
@@ -402,16 +389,6 @@ void Widget::micFoundNote(int value)
                                      " border-width: 3px; border-color: black;}");
         }
     }
-
-    // QMessageBox::StandardButton reply;
-    // reply = QMessageBox::question(this, "Timed Out", "Continue?",
-    //                               QMessageBox::Yes|QMessageBox::No);
-    // if (reply == QMessageBox::Yes) {
-    //     qDebug() << "continuing...";
-    // } else {
-    //     qDebug() << "No was clicked";
-    //     QApplication::quit();
-    // }
     ui->note0->repaint();
     QThread::currentThread()->msleep(displayDuration);
     ui->note0->setStyleSheet("QLabel { background-color: white;"
@@ -582,9 +559,12 @@ void Widget::do_Quiz(int)
 {
     m_Speaker->newTest( rawRecArrays[testNotes[nPos]]);
     qDebug() << "testNotes value: " << testNotes[nPos];
+    playedNote = testNotes[nPos] - 1;
+    kbPlayedNote = playedNote + tonicNote;
     m_Speaker->start();
     m_audioOutput->stop();
     m_audioOutput->start(m_Speaker.data());
+    MicThread.start();
 }
 
 void Widget::on_btnNext_clicked()

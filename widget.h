@@ -28,11 +28,9 @@ public:
     qreal getNoteValue(const char *data, qint64 len) const;
 
 public slots:
-    void endMicInput();
 
 signals:
     void levelChanged(qreal level);
-    void haltstream() const;
     void on_timeOut() const;
 
 private:
